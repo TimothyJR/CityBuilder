@@ -16,27 +16,39 @@ This is what generation looks like using 4 building meshes:
 ![alt text](Images/CityZoomed.png)
 
 Known Bugs:
-	- Buildings don't check for collisions with each other when being spawned. Causes buildings to spawn on each other at road corners.
-	- Sidewalk meshes don't have hard edges.
+- Buildings don't check for collisions with each other when being spawned. Causes buildings to spawn on each other at road corners.
+- Sidewalk meshes don't have hard edges.
 
 Planned Features:
-	- Building Types
-		Allow only certain building types to spawn near an intersection
-	- Special Buildings.
-		Allow a minimum and maximum of a building to be spawned in the city
-	- Bezier Sidewalks.
-		Use bezier curves and pre-created meshes to generate sidewalks for an overall cleaner looking solution.
+- Building Types
+Allow only certain building types to spawn near an intersection
 	
+- Special Buildings.
+Allow a minimum and maximum of a building to be spawned in the city
+
+- Bezier Sidewalks.
+Use bezier curves and pre-created meshes to generate sidewalks for an overall cleaner looking solution.
+
+- Add street lines
+
 Quality of Life Improvements:
-	- Allow user to set intersection merge distance.
-	- Buildings Preview to allow for a better look at the final generation
-	- Inspector Overhaul.
-		Separation of tools into tabs (City, Intersection, Road, Preview)
-	- Use serialized objects and serialized properties to allow for undo-redo.
-	- Code optimization - Make the city hold a list of roads to eliminate some double loops and free up some memory during generation.
+- Allow user to set intersection merge distance.
+
+- Buildings Preview to allow for a better look at the final generation
+
+- Inspector Overhaul.
+Separation of tools into tabs (City, Intersection, Road, Preview)
+
+- Use serialized objects and serialized properties to allow for undo-redo.
+
+- Code optimization - Make the city hold a list of roads to eliminate some double loops and free up some memory during generation.
+	
 	
 Things to look into:
-	- Bezier curve for roads.
-	- Support for Y axis cities
-	- Multiselect on intersections
-	- Selecting roads to edit their properties separately
+- Bezier curve for roads.
+
+- Support for Y axis cities.
+
+- Multiselect on intersections.
+
+- Selecting roads to edit their properties separately.
