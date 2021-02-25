@@ -373,6 +373,7 @@ public class CityGeneratorEditor : Editor
 	{
 		GameObject parentObject = new GameObject();
 		parentObject.name = "Intersections";
+		parentObject.isStatic = true;
 
 		PriorityQueue<RoadSegment> roads = new PriorityQueue<RoadSegment>();
 		for (int i = 0; i < city.Nodes.Count; i++)
@@ -464,6 +465,7 @@ public class CityGeneratorEditor : Editor
 
 		// Create our mesh object in the world
 		GameObject intersection = new GameObject();
+		intersection.name = "Intersection Mesh";
 		MeshRenderer renderer = intersection.AddComponent<MeshRenderer>();
 		MeshFilter filter = intersection.AddComponent<MeshFilter>();
 		MeshCollider collider = intersection.AddComponent<MeshCollider>();
@@ -472,6 +474,7 @@ public class CityGeneratorEditor : Editor
 		collider.sharedMesh = mesh;
 		renderer.material = city.RoadMaterial;
 		intersection.transform.parent = parentObject.transform;
+		intersection.isStatic = true;
 	}
 
 	/// <summary>
@@ -483,6 +486,7 @@ public class CityGeneratorEditor : Editor
 	{
 		GameObject parentObject = new GameObject();
 		parentObject.name = "Roads";
+		parentObject.isStatic = true;
 
 		HashSet<Intersection> finished = new HashSet<Intersection>();
 
@@ -506,6 +510,7 @@ public class CityGeneratorEditor : Editor
 
 					// Create our mesh object in the world
 					GameObject road = new GameObject();
+					road.name = "Road Mesh";
 					MeshRenderer roadRenderer = road.AddComponent<MeshRenderer>();
 					MeshFilter roadFilter = road.AddComponent<MeshFilter>();
 					MeshCollider collider = road.AddComponent<MeshCollider>();
@@ -516,6 +521,7 @@ public class CityGeneratorEditor : Editor
 					collider.sharedMesh = roadMesh;
 					roadRenderer.material = city.RoadMaterial;
 					road.transform.parent = parentObject.transform;
+					road.isStatic = true;
 				}
 			}
 		}
@@ -529,6 +535,7 @@ public class CityGeneratorEditor : Editor
 	{
 		GameObject parentObject = new GameObject();
 		parentObject.name = "Block";
+		parentObject.isStatic = true;
 
 		HashSet<SidewalkCheckHelper> usedRoads = new HashSet<SidewalkCheckHelper>();
 		List<Sidewalk> sidewalks = new List<Sidewalk>();
@@ -556,6 +563,7 @@ public class CityGeneratorEditor : Editor
 		GameObject buildingObject = new GameObject();
 		buildingObject.name = "Buildings";
 		buildingObject.transform.parent = parentObject.transform;
+		buildingObject.isStatic = true;
 
 		HashSet<RoadSegment> roads = new HashSet<RoadSegment>();
 		for(int i = 0; i < city.Nodes.Count; i++)
@@ -591,6 +599,7 @@ public class CityGeneratorEditor : Editor
 		RoadSegment nextSegment = null;
 
 		GameObject go = new GameObject();
+		go.name = "Sidewalk Mesh";
 		Sidewalk sidewalk = go.AddComponent<Sidewalk>();
 		sidewalk.SidewalkMaterial = city.SidewalkMaterial;
 		sidewalk.InnerMaterial = city.InnerBlockMaterial;
@@ -648,7 +657,7 @@ public class CityGeneratorEditor : Editor
 		sidewalk.CalculateVertices();
 		sidewalk.CreateMesh();
 		go.transform.parent = parent.transform;
-
+		go.isStatic = true;
 		return sidewalk;
 	}
 
@@ -703,9 +712,12 @@ public class CityGeneratorEditor : Editor
 			if (colliders.Length == 0)
 			{
 				GameObject spawnedObject = GameObject.Instantiate(city.Buildings[randomIndex]);
+				spawnedObject.name = "Spawned Building";
 				spawnedObject.transform.position = positionToCheck;
 				spawnedObject.transform.rotation = rotation;
 				spawnedObject.transform.parent = parent.transform;
+
+				spawnedObject.isStatic = true;
 
 				currentIncrement += colliderBounds.x + city.SpaceBetweenBuildings;
 			}
