@@ -32,6 +32,26 @@ public class CityGeneratorEditor : Editor
 	private CityInfo previousCity = null;
 
 	/// <summary>
+	/// The tab to show in the inspector
+	/// </summary>
+	int currentTab = 0;
+
+	/// <summary>
+	/// Tabs for the inspector
+	/// </summary>
+	string[] tabs = { "General", "Intersection", "Road", "Buildings", "Materials", "Preview" };
+
+	/// <summary>
+	/// Base color for the preview
+	/// </summary>
+	Color baseColor = Color.white;
+
+	/// <summary>
+	/// Color for selected things
+	/// </summary>
+	Color selectedColor = Color.green;
+
+	/// <summary>
 	/// Holds control IDs for the intersections to find the selected nodes
 	/// </summary>
 	private Dictionary<int, Intersection> selectionLookUp = new Dictionary<int, Intersection>();
@@ -51,86 +71,115 @@ public class CityGeneratorEditor : Editor
 				Init();
 			}
 
-			// Get all material fields
-			city.RoadMaterial = EditorGUILayout.ObjectField("Road Material", city.RoadMaterial, typeof(Material), false) as Material;
-			city.SidewalkMaterial = EditorGUILayout.ObjectField("General Sidewalk Material", city.SidewalkMaterial, typeof(Material), false) as Material;
-			city.InnerBlockMaterial = EditorGUILayout.ObjectField("Sidewalk Fill Material", city.InnerBlockMaterial, typeof(Material), false) as Material;
+			currentTab = GUILayout.Toolbar(currentTab, tabs);
 
-			// Create our building list
-			SerializedObject cityObject = new SerializedObject(city);
-			SerializedProperty buildingList = cityObject.FindProperty("buildings");
-			EditorGUILayout.PropertyField(buildingList);
-			cityObject.ApplyModifiedProperties();
-
-			// Button to generate the city
-			if (GUILayout.Button("Generate City"))
+			switch (currentTab)
 			{
-				GenerateIntersections();
-				GenerateRoads();
-				GenerateBlock();
-			}
-
-			// Inspector for the Intersectiosn
-			if (selectedNode != null)
-			{
-				GUILayout.Label($"Selected Intersection Tools:");
-				StartIndent(10.0f);
-				{
-					selectedNode.Position = EditorGUILayout.Vector3Field("Position", selectedNode.Position);
-					if (GUILayout.Button("Merge Nearby"))
+				// General
+				case 0:
+					// Button to generate the city
+					if (GUILayout.Button("Generate City"))
 					{
-						MergeIntersectionByDistance(selectedNode);
+						GenerateIntersections();
+						GenerateRoads();
+						GenerateBlock();
 					}
+					break;
 
-					if (GUILayout.Button("Delete Intersection"))
+				// Intersection
+				case 1:
+					if (selectedNode != null)
 					{
-						if (city.Nodes.Count > 1)
+						GUILayout.Label($"Selected Intersection Tools:");
+						StartIndent(10.0f);
 						{
-							DeleteIntersection(selectedNode);
-						}
-						else
-						{
-							Debug.Log("Cannot delete the final intersection of this city");
-						}
-					}
-				}
-				EndIndent();
-			}
-
-			// Prevent a null ref if the selected node got deleted in the above code
-			// TODO: Add tabs to code and remove this if check and put it under a "Road" Tab
-			if(selectedNode != null)
-			{
-				// Inspector for Roads
-				GUILayout.Label("Road Tools");
-				StartIndent(10.0f);
-				{
-					for (int i = 0; i < selectedNode.Roads.Count; i++)
-					{
-						GUILayout.Label($"Road {i}:");
-						StartIndent(30.0f);
-						{
-							selectedNode.Roads[i].RoadWidth = EditorGUILayout.FloatField("Width:", selectedNode.Roads[i].RoadWidth);
-							selectedNode.Roads[i].SetRoadOffset(EditorGUILayout.FloatField("Offset:", selectedNode.Roads[i].GetRoadOffset(selectedNode)), selectedNode);
-							GUILayout.BeginHorizontal();
+							selectedNode.Position = EditorGUILayout.Vector3Field("Position", selectedNode.Position);
+							if (GUILayout.Button("Merge Nearby"))
 							{
+								MergeIntersectionByDistance(selectedNode);
+							}
 
-								if (GUILayout.Button("Split"))
+							if (GUILayout.Button("Delete Intersection"))
+							{
+								if (city.Nodes.Count > 1)
 								{
-									selectedNode.SplitRoad(selectedNode.Roads[i], city);
+									DeleteIntersection(selectedNode);
 								}
-
-								if (GUILayout.Button("Delete"))
+								else
 								{
-									selectedNode.RemoveConnection(selectedNode.Roads[i]);
+									Debug.Log("Cannot delete the final intersection of this city");
 								}
 							}
-							GUILayout.EndHorizontal();
 						}
 						EndIndent();
 					}
-				}
-				EndIndent();
+					else
+					{
+						EditorGUILayout.LabelField("There is no selected intersection");
+					}
+					break;
+
+				// Road
+				case 2:
+					if (selectedNode != null)
+					{
+						// Inspector for Roads
+						GUILayout.Label("Road Tools");
+						StartIndent(10.0f);
+						{
+							for (int i = 0; i < selectedNode.Roads.Count; i++)
+							{
+								GUILayout.Label($"Road {i}:");
+								StartIndent(30.0f);
+								{
+									selectedNode.Roads[i].RoadWidth = EditorGUILayout.FloatField("Width:", selectedNode.Roads[i].RoadWidth);
+									selectedNode.Roads[i].SetRoadOffset(EditorGUILayout.FloatField("Offset:", selectedNode.Roads[i].GetRoadOffset(selectedNode)), selectedNode);
+									GUILayout.BeginHorizontal();
+									{
+
+										if (GUILayout.Button("Split"))
+										{
+											selectedNode.SplitRoad(selectedNode.Roads[i], city);
+										}
+
+										if (GUILayout.Button("Delete"))
+										{
+											selectedNode.RemoveConnection(selectedNode.Roads[i]);
+										}
+									}
+									GUILayout.EndHorizontal();
+								}
+								EndIndent();
+							}
+						}
+						EndIndent();
+					}
+					break;
+
+				// Buildings
+				case 3:
+					// Create our building list
+					SerializedObject cityObject = new SerializedObject(city);
+					SerializedProperty buildingList = cityObject.FindProperty("buildings");
+					EditorGUILayout.PropertyField(buildingList);
+					cityObject.ApplyModifiedProperties();
+					break;
+
+				// Materials
+				case 4:
+					// Get all material fields
+					city.RoadMaterial = EditorGUILayout.ObjectField("Road Material", city.RoadMaterial, typeof(Material), false) as Material;
+					city.SidewalkMaterial = EditorGUILayout.ObjectField("General Sidewalk Material", city.SidewalkMaterial, typeof(Material), false) as Material;
+					city.InnerBlockMaterial = EditorGUILayout.ObjectField("Sidewalk Fill Material", city.InnerBlockMaterial, typeof(Material), false) as Material;
+					break;
+
+				// Preview
+				case 5:
+					baseColor = EditorGUILayout.ColorField("Base Color", baseColor);
+					selectedColor = EditorGUILayout.ColorField("Selected Color", selectedColor);
+					break;
+				default:
+					break;
 			}
 		}
 
@@ -251,11 +300,11 @@ public class CityGeneratorEditor : Editor
 			// Draw selection as green
 			if (city.Nodes[i] == selectedNode)
 			{
-				Handles.color = Color.green;
+				Handles.color = selectedColor;
 			}
 			else
 			{
-				Handles.color = Color.white;
+				Handles.color = baseColor;
 			}
 
 			Handles.DrawWireCube(city.Nodes[i].Position, new Vector3(3.0f, 3.0f, 3.0f));
@@ -279,19 +328,19 @@ public class CityGeneratorEditor : Editor
 			{
 				if (city.Nodes[i] == selectedNode)
 				{
-					Handles.color = Color.green;
+					Handles.color = selectedColor;
 					DrawRoad(city.Nodes[i].Position, city.Nodes[i].Roads[j].GetOtherSide(city.Nodes[i]).Position, city.Nodes[i].Roads[j].RoadWidth, city.Nodes[i].Roads[j].GetRoadOffset(city.Nodes[i]));
 					Handles.Label((city.Nodes[i].Position + city.Nodes[i].Roads[j].GetOtherSide(city.Nodes[i]).Position) / 2, j.ToString());
 				}
 				else if (city.Nodes[i].Roads[j].GetOtherSide(city.Nodes[i]) == selectedNode)
 				{
 					int a = j;
-					Handles.color = Color.green;
+					Handles.color = selectedColor;
 					DrawRoad(city.Nodes[i].Position, city.Nodes[i].Roads[j].GetOtherSide(city.Nodes[i]).Position, city.Nodes[i].Roads[j].RoadWidth, city.Nodes[i].Roads[j].GetRoadOffset(city.Nodes[i]));
 				}
 				else
 				{
-					Handles.color = Color.white;
+					Handles.color = baseColor;
 					DrawRoad(city.Nodes[i].Position, city.Nodes[i].Roads[j].GetOtherSide(city.Nodes[i]).Position, city.Nodes[i].Roads[j].RoadWidth, city.Nodes[i].Roads[j].GetRoadOffset(city.Nodes[i]));
 				}
 			}
