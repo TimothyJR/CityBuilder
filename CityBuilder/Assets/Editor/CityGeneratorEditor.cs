@@ -34,22 +34,32 @@ public class CityGeneratorEditor : Editor
 	/// <summary>
 	/// The tab to show in the inspector
 	/// </summary>
-	int currentTab = 0;
+	private int currentTab = 0;
 
 	/// <summary>
 	/// Tabs for the inspector
 	/// </summary>
-	string[] tabs = { "General", "Intersection", "Road", "Buildings", "Materials", "Preview" };
+	private string[] tabs = { "General", "Intersection", "Road", "Buildings", "Materials", "Preview" };
 
 	/// <summary>
 	/// Base color for the preview
 	/// </summary>
-	Color baseColor = Color.white;
+	private Color baseColor = Color.white;
+
+	/// <summary>
+	/// Name of the base color used for editor preferences
+	/// </summary>
+	private const string BASE_COLOR_NAME = "Base Color";
 
 	/// <summary>
 	/// Color for selected things
 	/// </summary>
-	Color selectedColor = Color.green;
+	private Color selectedColor = Color.green;
+
+	/// <summary>
+	/// Name of the selected color used for editor preferences
+	/// </summary>
+	private const string SELECTED_COLOR_NAME = "Selected Color";
 
 	/// <summary>
 	/// Holds control IDs for the intersections to find the selected nodes
@@ -175,8 +185,8 @@ public class CityGeneratorEditor : Editor
 
 				// Preview
 				case 5:
-					baseColor = EditorGUILayout.ColorField("Base Color", baseColor);
-					selectedColor = EditorGUILayout.ColorField("Selected Color", selectedColor);
+					baseColor = SetEditorColorField(BASE_COLOR_NAME, ref baseColor);
+					selectedColor = SetEditorColorField(SELECTED_COLOR_NAME, ref selectedColor);
 					break;
 				default:
 					break;
@@ -204,6 +214,66 @@ public class CityGeneratorEditor : Editor
 	{
 		GUILayout.EndVertical();
 		GUILayout.EndHorizontal();
+	}
+
+	/// <summary>
+	/// Initialize the city if there is nothing
+	/// </summary>
+	private void Init()
+	{
+		if (city.Nodes == null)
+		{
+			city.Nodes = new List<Intersection>();
+		}
+
+		if (city.Nodes.Count == 0)
+		{
+			Intersection intersection = Intersection.CreateIntersection(Vector3.zero, city);
+			AssetDatabase.SaveAssets();
+			selectedNode = intersection;
+			city.Nodes.Add(intersection);
+		}
+
+		// Load the colors
+		// Default colors are set here
+		baseColor = GetEditorColor(BASE_COLOR_NAME, Color.white);
+		selectedColor = GetEditorColor(SELECTED_COLOR_NAME, Color.green);
+	}
+
+	/// <summary>
+	/// Sets an editor preference for the color
+	/// </summary>
+	/// <param name="name"></param>
+	/// <param name="color"></param>
+	private Color SetEditorColorField(string name, ref Color color)
+	{
+		Color tempColor = color;
+
+		tempColor = EditorGUILayout.ColorField(name, color);
+
+		if (color != tempColor)
+		{
+			EditorPrefs.SetFloat($"{name}_R", color.r);
+			EditorPrefs.SetFloat($"{name}_G", color.g);
+			EditorPrefs.SetFloat($"{name}_B", color.b);
+			EditorPrefs.SetFloat($"{name}_A", color.a);
+		}
+
+		return tempColor;
+	}
+
+	/// <summary>
+	/// Gets the editor preference for the color if stored
+	/// </summary>
+	/// <param name="name"></param>
+	/// <param name="defaultColor"></param>
+	/// <returns></returns>
+	private Color GetEditorColor(string name, Color defaultColor)
+	{
+		return new Color(EditorPrefs.GetFloat($"{name}_R", defaultColor.r),
+			EditorPrefs.GetFloat($"{name}_G", defaultColor.g),
+			EditorPrefs.GetFloat($"{name}_B", defaultColor.b),
+			EditorPrefs.GetFloat($"{name}_A", defaultColor.a));
 	}
 
 	#endregion
@@ -267,25 +337,6 @@ public class CityGeneratorEditor : Editor
 		}
 
 		Selection.activeGameObject = (target as CityGenerator).gameObject;
-	}
-
-	/// <summary>
-	/// Initialize the city if there is nothing
-	/// </summary>
-	private void Init()
-	{
-		if (city.Nodes == null)
-		{
-			city.Nodes = new List<Intersection>();
-		}
-
-		if (city.Nodes.Count == 0)
-		{
-			Intersection intersection = Intersection.CreateIntersection(Vector3.zero, city);
-			AssetDatabase.SaveAssets();
-			selectedNode = intersection;
-			city.Nodes.Add(intersection);
-		}
 	}
 
 	/// <summary>
