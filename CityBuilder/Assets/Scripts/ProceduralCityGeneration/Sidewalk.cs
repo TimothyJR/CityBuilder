@@ -86,6 +86,38 @@ public class Sidewalk : MonoBehaviour
 	//}
 
 	/// <summary>
+	/// Only sidewalks that are enclosed are valid
+	/// </summary>
+	/// <returns></returns>
+	public bool IsSurroundingSidewalk()
+	{
+		int greaterThan180 = 0;
+		int lessThan180 = 0;
+
+		for (int i = 0; i < originalVertices.Count; i++)
+		{
+			Vector3 a = originalVertices[i] - originalVertices[(i + 1) % originalVertices.Count];
+			Vector3 b = originalVertices[(i + 2) % originalVertices.Count] - originalVertices[(i + 1) % originalVertices.Count];
+
+			if(GetClockwiseAngle(a, b) > 180)
+			{
+				greaterThan180++;
+			}
+			else
+			{
+				lessThan180++;
+			}
+		}
+
+		if(greaterThan180 > lessThan180)
+		{
+			return true;
+		}
+
+		return false;
+	}
+
+	/// <summary>
 	/// Adjusts the position of the vertices for the mesh position
 	/// </summary>
 	public void FixMeshOffset()
@@ -240,7 +272,8 @@ public class Sidewalk : MonoBehaviour
 			innerBlock = new GameObject();
 			innerBlock.transform.parent = transform;
 			innerBlock.transform.localPosition = Vector3.zero;
-			innerBlock.AddComponent<MeshRenderer>().material = innerMaterial;
+			innerBlock.AddComponent<MeshRenderer>();
+			innerBlock.GetComponent<MeshRenderer>().sharedMaterial = innerMaterial;
 			innerBlock.AddComponent<MeshFilter>();
 			innerBlock.AddComponent<MeshCollider>();
 		}
@@ -256,30 +289,39 @@ public class Sidewalk : MonoBehaviour
 		Stack<int> pointToCheck = new Stack<int>();
 		List<int> triangles = new List<int>();
 
-		pointToCheck.Push(0);
-		for(int i = 2; i < innerVertices.Length; i++)
+
+		if(innerVertices.Length > 3)
 		{
-			if(!FindInnerTriangles(pointToCheck, innerVertices, triangles, i, i - 1))
+			pointToCheck.Push(0);
+			for (int i = 2; i < innerVertices.Length; i++)
 			{
-				pointToCheck.Push(i - 1);
+				if (!FindInnerTriangles(pointToCheck, innerVertices, triangles, i, i - 1))
+				{
+					pointToCheck.Push(i - 1);
+				}
+			}
+
+			// Close the mesh
+			if (triangles.Count > 2)
+			{
+				triangles.Add(innerVertices.Length - 1);
+				if (triangles[triangles.Count - 2] == 0)
+				{
+					triangles.Add(triangles[triangles.Count - 4]);
+				}
+				else
+				{
+					triangles.Add(triangles[triangles.Count - 2]);
+				}
+				triangles.Add(0);
 			}
 		}
-
-		// Close the mesh
-		if(triangles.Count > 2)
+		else
 		{
-			triangles.Add(innerVertices.Length - 1);
-			if (triangles[triangles.Count - 2] == 0)
-			{
-				triangles.Add(triangles[triangles.Count - 4]);
-			}
-			else
-			{
-				triangles.Add(triangles[triangles.Count - 2]);
-			}
+			triangles.Add(2);
+			triangles.Add(1);
 			triangles.Add(0);
 		}
-
 
 		Mesh mesh = new Mesh();
 		mesh.vertices = innerVertices;

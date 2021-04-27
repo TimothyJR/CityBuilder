@@ -1,6 +1,8 @@
 ﻿using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
+using Unity.EditorCoroutines.Editor;
+using System.Collections;
 
 [CustomEditor(typeof(CityGenerator))]
 public class CityGeneratorEditor : Editor
@@ -66,6 +68,9 @@ public class CityGeneratorEditor : Editor
 	/// </summary>
 	private Dictionary<int, Intersection> selectionLookUp = new Dictionary<int, Intersection>();
 
+	private int smallestBuildingXIndex = 0;
+	private int smallestBuildingZIndex = 0;
+
 	#region Inspector
 
 	public override void OnInspectorGUI()
@@ -90,9 +95,7 @@ public class CityGeneratorEditor : Editor
 					// Button to generate the city
 					if (GUILayout.Button("Generate City"))
 					{
-						GenerateIntersections();
-						GenerateRoads();
-						GenerateBlock();
+						GenerateCity();
 					}
 					break;
 
@@ -466,6 +469,13 @@ public class CityGeneratorEditor : Editor
 
 	#region Final Generation
 
+	private void GenerateCity()
+	{
+		GenerateIntersections();
+		GenerateRoads();
+		EditorCoroutineUtility.StartCoroutine(GenerateBlock(), this);
+	}
+
 	/// <summary>
 	/// Finds all the points for the intersection mesh and generates it
 	/// </summary>
@@ -631,7 +641,7 @@ public class CityGeneratorEditor : Editor
 	/// Goes road by road to create sidewalks
 	/// Once a side of the road (designated by a road and the intersection it comes from) is used, don't try to use it again
 	/// </summary>
-	private void GenerateBlock()
+	private IEnumerator GenerateBlock()
 	{
 		GameObject parentObject = new GameObject();
 		parentObject.name = "Block";
@@ -673,7 +683,7 @@ public class CityGeneratorEditor : Editor
 				if (!roads.Contains(city.Nodes[i].Roads[j]))
 				{
 					roads.Add(city.Nodes[i].Roads[j]);
-					CreateBuildings(city.Nodes[i].Roads[j], buildingObject);
+					yield return EditorCoroutineUtility.StartCoroutine(CreateBuildings(city.Nodes[i].Roads[j], buildingObject), this);
 				}
 			}
 		}
@@ -681,7 +691,10 @@ public class CityGeneratorEditor : Editor
 		// After buildings are created, create the infill mesh
 		for(int i = 0; i < sidewalks.Count; i++)
 		{
-			sidewalks[i].CreateFillMesh();
+			if(!sidewalks[i].IsSurroundingSidewalk())
+			{
+				sidewalks[i].CreateFillMesh();
+			}
 		}
 	}
 
@@ -701,8 +714,6 @@ public class CityGeneratorEditor : Editor
 		GameObject go = new GameObject();
 		go.name = "Sidewalk Mesh";
 		Sidewalk sidewalk = go.AddComponent<Sidewalk>();
-		sidewalk.SidewalkMaterial = city.SidewalkMaterial;
-		sidewalk.InnerMaterial = city.InnerBlockMaterial;
 		sidewalk.OriginalVertices.Add(roadSegment.GetVertexWorldPosition(startIntersection, false));
 		SidewalkCheckHelper check = new SidewalkCheckHelper();
 
@@ -744,14 +755,17 @@ public class CityGeneratorEditor : Editor
 			sidewalk.OriginalVertices.Add(nextSegment.GetVertexWorldPosition(next, true));
 		}
 
+
 		Vector3 sum = Vector3.zero;
 
-		for(int i = 0; i < sidewalk.OriginalVertices.Count; i++)
+		for (int i = 0; i < sidewalk.OriginalVertices.Count; i++)
 		{
 			sum += sidewalk.OriginalVertices[i];
 		}
 
 		go.transform.position = sum / sidewalk.OriginalVertices.Count;
+		sidewalk.SidewalkMaterial = city.SidewalkMaterial;
+		sidewalk.InnerMaterial = city.InnerBlockMaterial;
 		sidewalk.FixMeshOffset();
 		sidewalk.FindDirection();
 		sidewalk.CalculateVertices();
@@ -766,22 +780,47 @@ public class CityGeneratorEditor : Editor
 	/// </summary>
 	/// <param name="road"></param>
 	/// <param name="parent"></param>
-	private void CreateBuildings(RoadSegment road, GameObject parent)
+	private IEnumerator CreateBuildings(RoadSegment road, GameObject parent)
 	{
 		// Don't do anything if there is nothing to spawn
 		if (city.Buildings.Count > 0)
 		{
+			FindSmallestBuilding();
+
 			Vector3 direction = road.ConnectionPointA.Position - road.ConnectionPointB.Position;
 			Vector3 perpendicular = new Vector3(direction.z, 0.0f, -direction.x).normalized;
 
-			float finalDistance = direction.magnitude;
-
 			SpawnBuildingsAlongRoad(direction.magnitude, road.ConnectionPointB.Position, perpendicular, direction.normalized, road.GetRoadEdgeOffset(road.ConnectionPointB), parent);
-			SpawnBuildingsAlongRoad(direction.magnitude, road.ConnectionPointB.Position, -perpendicular, direction.normalized, road.GetRoadEdgeOffset(road.ConnectionPointA), parent);
+			yield return null;
+			SpawnBuildingsAlongRoad(direction.magnitude, road.ConnectionPointA.Position, -perpendicular, -direction.normalized, road.GetRoadEdgeOffset(road.ConnectionPointA), parent);
+			yield return null;
 		}
 		else
 		{
 			Debug.Log("There are no buildings to spawn in the building list.");
+		}
+	}
+
+	private void FindSmallestBuilding()
+	{
+		Vector3 xExtents = city.Buildings[0].GetComponent<MeshRenderer>().bounds.extents;
+		Vector3 zExtents = city.Buildings[0].GetComponent<MeshRenderer>().bounds.extents;
+		smallestBuildingXIndex = 0;
+		smallestBuildingZIndex = 0;
+
+		for (int i = 1; i < city.Buildings.Count; i++)
+		{
+			Vector3 newExtents = city.Buildings[i].GetComponent<MeshRenderer>().bounds.extents;
+
+			if(newExtents.x < xExtents.x)
+			{
+				smallestBuildingXIndex = i;
+			}
+
+			if(newExtents.z < zExtents.z)
+			{
+				smallestBuildingZIndex = i;
+			}
 		}
 	}
 
@@ -797,35 +836,89 @@ public class CityGeneratorEditor : Editor
 	private void SpawnBuildingsAlongRoad(float finalDistance, Vector3 startingPosition, Vector3 perpendicular, Vector3 direction, float roadSize, GameObject parent)
 	{
 		float currentIncrement = 0;
+		List<Collider> objectsBeingSpawned = new List<Collider>();
+		bool wasAbleToSpawn = false;
+		float lastSpawnIndexStart = 0.0f;
 
 		while (currentIncrement < finalDistance)
 		{
 			int randomIndex = Random.Range(0, city.Buildings.Count);
-			Vector3 colliderBounds = city.Buildings[randomIndex].GetComponent<MeshRenderer>().bounds.extents;
-			Vector3 positionToCheck = startingPosition + (perpendicular * (city.SideWalkWidth + city.SpaceBetweenSideAndBuilding + colliderBounds.z + roadSize)) + direction * (currentIncrement + colliderBounds.x);
-			Quaternion rotation = Quaternion.Euler(0.0f, Vector3.SignedAngle(-Vector3.forward, -perpendicular, Vector3.up), 0.0f);
-			currentIncrement += colliderBounds.x;
+			float xBounds;
 
-			Collider[] colliders = Physics.OverlapBox(positionToCheck, colliderBounds, rotation);
-			
-			// If we don't have any collisions, spawn a building
-			if (colliders.Length == 0)
+			Collider building = SpawnBuilding(randomIndex, currentIncrement, out xBounds, startingPosition, perpendicular, direction, roadSize, parent);
+			if (building != null)
 			{
-				GameObject spawnedObject = GameObject.Instantiate(city.Buildings[randomIndex]);
-				spawnedObject.name = "Spawned Building";
-				spawnedObject.transform.position = positionToCheck;
-				spawnedObject.transform.rotation = rotation;
-				spawnedObject.transform.parent = parent.transform;
-
-				spawnedObject.isStatic = true;
-
-				currentIncrement += colliderBounds.x + city.SpaceBetweenBuildings;
+				objectsBeingSpawned.Add(building);
+				wasAbleToSpawn = true;
+				currentIncrement += (xBounds * 2) + city.SpaceBetweenBuildings;
 			}
 			else
 			{
+				if (wasAbleToSpawn)
+				{
+					lastSpawnIndexStart = currentIncrement - city.SpaceBetweenBuildings;
+					wasAbleToSpawn = false;
+				}
 				currentIncrement += city.SpaceBetweenBuildings;
 			}
 		}
+
+		// If we couldn't spawn a final building, try to see if one of the smallest buildings will fit in that space
+		if(!wasAbleToSpawn)
+		{
+			Collider building = SpawnBuilding(smallestBuildingXIndex, lastSpawnIndexStart, out _, startingPosition, perpendicular, direction, roadSize, parent);
+			if (building != null)
+			{
+				objectsBeingSpawned.Add(building);
+			}
+			else
+			{
+				building = SpawnBuilding(smallestBuildingZIndex, lastSpawnIndexStart, out _, startingPosition, perpendicular, direction, roadSize, parent);
+				if (building != null)
+				{
+					objectsBeingSpawned.Add(building);
+				}
+			}
+		}
+
+		for(int i = 0; i < objectsBeingSpawned.Count; i++)
+		{
+			objectsBeingSpawned[i].enabled = true;
+		}
+	}
+
+	private Collider SpawnBuilding(int buildingIndex, float distanceAlongRoad, out float xBounds, Vector3 startingPosition, Vector3 perpendicular, Vector3 direction, float roadSize, GameObject parent)
+	{
+		Vector3 meshBounds = city.Buildings[buildingIndex].GetComponent<MeshRenderer>().bounds.extents;
+		Vector3 meshCenter = city.Buildings[buildingIndex].GetComponent<MeshRenderer>().bounds.center;
+		Vector3 positionToCheck = startingPosition + (perpendicular * (city.SideWalkWidth + city.SpaceBetweenSideAndBuilding + meshBounds.z + roadSize)) + direction * (distanceAlongRoad + meshBounds.x);
+		Quaternion rotation = Quaternion.Euler(0.0f, Vector3.SignedAngle(-Vector3.forward, -perpendicular, Vector3.up), 0.0f);
+		xBounds = meshBounds.x;
+
+		Collider[] colliders = Physics.OverlapBox(positionToCheck, meshBounds, rotation);
+
+		// If we don't have any collisions, spawn a building
+		if (colliders.Length == 0)
+		{
+			GameObject spawnedObject = GameObject.Instantiate(city.Buildings[buildingIndex]);
+			spawnedObject.name = $"Spawned Building {buildingIndex}";
+
+			// Find the spawn point taking into account that the mesh might not be centered
+			Vector3 positionToSpawn = startingPosition + (perpendicular * (city.SideWalkWidth + city.SpaceBetweenSideAndBuilding + meshBounds.z - meshCenter.z + roadSize)) + direction * (distanceAlongRoad + meshBounds.x + meshCenter.x);
+
+			spawnedObject.transform.position = positionToSpawn;
+			spawnedObject.transform.rotation = rotation;
+			spawnedObject.transform.parent = parent.transform;
+			spawnedObject.isStatic = true;
+
+			// The buildings will cause false positives for collisions until the transforms are synced. Disable them until we have spawned all buildings on this road
+			Collider collider = spawnedObject.GetComponent<Collider>();
+			collider.enabled = false;
+
+			return collider;
+		}
+
+		return null;
 	}
 
 	/// <summary>
