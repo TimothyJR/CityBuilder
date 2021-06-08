@@ -16,7 +16,6 @@ This is what generation looks like using 4 building meshes:
 ![alt text](Images/CityZoomed.png)
 
 Known Bugs:
-- Buildings don't check for collisions with each other when being spawned. Causes buildings to spawn on each other at road corners.
 - Sidewalk meshes don't have hard edges.
 
 Planned Features:
